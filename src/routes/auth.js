@@ -1,38 +1,49 @@
+// Gerekli modüller
 const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const pool = require("../db");
+const pool = require("../db");  // db.js dosyanın yolu doğru mu? Eğer src içindeyse: ./db
 
-// Giriş: /api/auth/login
+// GİRİŞ ENDPOINTİ: /api/auth/login
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password)
+  // 1. E-posta ve şifre boşsa hata
+  if (!email || !password) {
     return res.status(400).json({ message: "E-posta ve şifre zorunlu." });
+  }
 
   try {
-    // Kullanıcıyı veritabanında bul
+    // 2. Kullanıcıyı veritabanından bul
     const [rows] = await pool.execute(
       "SELECT * FROM users WHERE email = ? LIMIT 1",
       [email]
     );
+
     const user = rows[0];
-    if (!user)
+    if (!user) {
       return res.status(401).json({ message: "Kullanıcı bulunamadı." });
+    }
 
-    // Şifre kontrolü
+    // 3. Şifreyi karşılaştır
     const match = await bcrypt.compare(password, user.password);
-    if (!match)
+    if (!match) {
       return res.status(401).json({ message: "Şifre hatalı." });
+    }
 
-    // JWT oluştur
+    // 4. JWT token oluştur
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role
+      },
+      process.env.JWT_SECRET, // .env dosyanda mutlaka JWT_SECRET olmalı!
       { expiresIn: "2d" }
     );
 
+    // 5. Başarılı yanıt
     res.json({
       token,
       role: user.role,
@@ -40,7 +51,9 @@ router.post("/login", async (req, res) => {
       id: user.id,
       message: "Giriş başarılı."
     });
+
   } catch (err) {
+    // Hata logla ve kullanıcıya dön
     console.error("Login error:", err);
     res.status(500).json({ message: "Sunucu hatası." });
   }
